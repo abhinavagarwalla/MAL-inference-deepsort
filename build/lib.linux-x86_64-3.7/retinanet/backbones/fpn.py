@@ -74,6 +74,8 @@ class FPN(nn.Module):
         last_inner = getattr(self, self.inner_blocks[-1])(x[-1])
         results = []
         results.append(getattr(self, self.layer_blocks[-1])(last_inner))
+        #for i in range(len(results)):
+        #   print(results[i].shape)
         for feature, inner_block, layer_block in zip(
             x[:-1][::-1], self.inner_blocks[:-1][::-1], self.layer_blocks[:-1][::-1]
         ):
@@ -91,7 +93,8 @@ class FPN(nn.Module):
         if self.top_blocks is not None:
             last_results = self.top_blocks(results[-1])
             results.extend(last_results)
-
+        #for i in range(len(results)):
+        #    print(results[i].shape)    
         return tuple(results)
 
 

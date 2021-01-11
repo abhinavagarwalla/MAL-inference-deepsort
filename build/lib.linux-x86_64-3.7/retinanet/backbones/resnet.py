@@ -19,6 +19,7 @@ import numpy as np
 import os
 from .layers import FrozenBatchNorm2d
 from .layers import Conv2d
+from .layers import FixedBatchNorm2d
 
 
 # ResNet stage specification
@@ -218,9 +219,10 @@ class BottleneckWithFixedBatchNorm(nn.Module):
                 Conv2d(
                     in_channels, out_channels, kernel_size=1, stride=stride, bias=False
                 ),
-                FrozenBatchNorm2d(out_channels),
+                #FrozenBatchNorm2d(out_channels),
+                FixedBatchNorm2d(out_channels),
             )
-
+        print('#####BottlencekFixedBN')
         # The original MSRA ResNet models have stride in the first 1x1 conv
         # The subsequent fb.torch.resnet and Caffe2 ResNe[X]t implementations have
         # stride in the 3x3 conv
@@ -233,7 +235,7 @@ class BottleneckWithFixedBatchNorm(nn.Module):
             stride=stride_1x1,
             bias=False,
         )
-        self.bn1 = FrozenBatchNorm2d(bottleneck_channels)
+        self.bn1 = FixedBatchNorm2d(bottleneck_channels)#FrozenBatchNorm2d(bottleneck_channels)
         # TODO: specify init for the above
 
         self.conv2 = Conv2d(
@@ -245,25 +247,31 @@ class BottleneckWithFixedBatchNorm(nn.Module):
             bias=False,
             groups=num_groups,
         )
-        self.bn2 = FrozenBatchNorm2d(bottleneck_channels)
+        self.bn2 = FixedBatchNorm2d(bottleneck_channels)#FrozenBatchNorm2d(bottleneck_channels)
 
         self.conv3 = Conv2d(
             bottleneck_channels, out_channels, kernel_size=1, bias=False
         )
-        self.bn3 = FrozenBatchNorm2d(out_channels)
+        self.bn3 = FixedBatchNorm2d(out_channels)#FrozenBatchNorm2d(out_channels)
 
     def forward(self, x):
         residual = x
 
         out = self.conv1(x)
+        #print('conv1')
+        #print(out.size())
         out = self.bn1(out)
         out = F.relu_(out)
 
         out = self.conv2(out)
+        #print('conv2')
+        #print(out.size())
         out = self.bn2(out)
         out = F.relu_(out)
 
         out0 = self.conv3(out)
+        #print('conv3')
+        #print(out0.size())
         out = self.bn3(out0)
 
         if self.downsample is not None:
@@ -284,7 +292,7 @@ class StemWithFixedBatchNorm(nn.Module):
         self.conv1 = Conv2d(
             3, out_channels, kernel_size=7, stride=2, padding=3, bias=False
         )
-        self.bn1 = FrozenBatchNorm2d(out_channels)
+        self.bn1 = FixedBatchNorm2d(out_channels)#FrozenBatchNorm2d(out_channels)
 
     def forward(self, x):
         # np.save(os.path.join('/workspace/retinanet/debug', 'stem_x.npy'), x.cpu().numpy())

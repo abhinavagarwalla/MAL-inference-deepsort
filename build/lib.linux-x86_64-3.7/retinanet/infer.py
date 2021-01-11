@@ -12,14 +12,19 @@ from .data import DataIterator
 from .dali import DaliDataIterator
 from .model import Model
 from .utils import Profiler
+from .utils import show_detections
 
-def infer(model, path, detections_file, resize, max_size, batch_size, mixed_precision=True, is_master=True, world=0, annotations=None, use_dali=True, is_validation=False, verbose=True):
+import cv2
+
+def infer(model, path, detections_file, resize, max_size, batch_size, mixed_precision=False, is_master=True, world=0, annotations=None, use_dali=True, is_validation=False, verbose=True):
     'Run inference on images from path'
 
+    print('model',model)
     backend = 'pytorch' if isinstance(model, Model) or isinstance(model, DDP) else 'tensorrt'
 
+    #print("backend",backend)
     stride = model.module.stride if isinstance(model, DDP) else model.stride
-
+    #print('!!!!!!!!model.stride:', model.stride)
     # Create annotations if none was provided
     if not annotations:
         annotations = tempfile.mktemp('.json')
@@ -62,11 +67,15 @@ def infer(model, path, detections_file, resize, max_size, batch_size, mixed_prec
     with torch.no_grad():
         for i, (data, ids, ratios) in enumerate(data_iterator):
             # Forward pass
+            #print('start  profiler')
             profiler.start('fw')
-            scores, boxes, classes = model(data, ids)
+            #print("data:",data)
+            scores, boxes, classes = model(data)
             profiler.stop('fw')
 
+            #cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
             results.append([scores, boxes, classes, ids, ratios])
+   
 
             profiler.bump('infer')
             if verbose and (profiler.totals['infer'] > 60 or i == len(data_iterator) - 1):
@@ -101,23 +110,27 @@ def infer(model, path, detections_file, resize, max_size, batch_size, mixed_prec
             if image_id in processed_ids:
                 continue
             processed_ids.add(image_id)
-
+              
             keep = (scores > 0).nonzero()
             scores = scores[keep].view(-1)
             boxes = boxes[keep, :].view(-1, 4) / ratios
             classes = classes[keep].view(-1).int()
-
+            #print('classes', classes)
             for score, box, cat in zip(scores, boxes, classes):
                 x1, y1, x2, y2 = box.data.tolist()
                 cat = cat.item()
                 if 'annotations' in data_iterator.coco.dataset:
                     cat = data_iterator.coco.getCatIds()[cat]
+                    #if cat !=3:
+                      #continue
+                    #print('cat',cat)
                 detections.append({
                     'image_id': image_id,
                     'score': score.item(),
                     'bbox': [x1, y1, x2 - x1 + 1, y2 - y1 + 1],
                     'category_id': cat
                 })
+                #show_detections(detections)
 
         if detections:
             # Save detections

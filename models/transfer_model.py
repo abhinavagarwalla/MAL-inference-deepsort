@@ -1,10 +1,10 @@
 import torch
 from collections import OrderedDict
 
-model_name = './resnet50/model_0090000.pth'
+model_name = './resnet50/mal_r-50-fpn_cocomodel_0090000.pth'#model_0090000.pth'
 transferred_model_name = './resnet50/transferred_model_0090000.pth'
-model_name = './resnext101/model_0180000.pth'
-transferred_model_name = './resnext101/transferred_model_0180000.pth'
+#model_name = './resnext101/model_0180000.pth'
+#transferred_model_name = './resnext101/transferred_model_0180000.pth'
 
 param_dict_freeanchor = torch.load(model_name)
 weights_freeanchor = param_dict_freeanchor['model']

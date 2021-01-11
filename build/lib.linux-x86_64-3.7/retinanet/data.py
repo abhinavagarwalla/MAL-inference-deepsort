@@ -22,6 +22,7 @@ class CocoDataset(data.dataset.Dataset):
         self.mean = [102.9801, 115.9465, 122.7717]
         self.std = [1., 1., 1.]
         self.training = training
+        self.image = False
 
         with redirect_stdout(None):
             self.coco = COCO(annotations)
@@ -74,7 +75,7 @@ class CocoDataset(data.dataset.Dataset):
             np.save(os.path.join('/workspace/retinanet/debug', '{}.npy'.format(id)), data.cpu().numpy())
         """
 
-        return data, id, ratio
+        return data, id, ratio 
 
     def _get_target(self, id):
         'Get annotations for sample'
@@ -136,6 +137,7 @@ class DataIterator():
         self.resize = resize
         self.max_size = max_size
 
+        print('Data loader for data parallel')
         self.dataset = CocoDataset(path, resize=resize, max_size=max_size,
             stride=stride, annotations=annotations, training=training)
         self.ids = self.dataset.ids

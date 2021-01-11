@@ -5,6 +5,7 @@ from ._C import nms as nms_cuda
 def generate_anchors(stride, ratio_vals, scales_vals):
     'Generate anchors coordinates from scales/ratios'
 
+    print('XXXXXXXXXXXXXGenerate anchors coordinates from scales/ratios')
     scales = torch.FloatTensor(scales_vals).repeat(len(ratio_vals), 1)
     scales = scales.transpose(0, 1).contiguous().view(-1, 1)
     ratios = torch.FloatTensor(ratio_vals * len(scales_vals))
@@ -152,6 +153,7 @@ def decode(all_cls_head, all_box_head, stride=1, threshold=0.05, top_n=1000, anc
     'Box Decoding and Filtering'
 
     if torch.cuda.is_available():
+       # import pdb;pdb.set_trace()
         return decode_cuda(all_cls_head.float(), all_box_head.float(),
             anchors.view(-1).tolist(), stride, threshold, top_n)
 

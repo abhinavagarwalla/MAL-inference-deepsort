@@ -112,6 +112,7 @@ class Model(nn.Module):
             return nn.Sequential(*layers)
 
         anchors = len(self.ratios) * len(self.scales)
+        #print('anchors',anchors)
         self.cls_head = make_head(classes * anchors)
         self.box_head = make_head(4 * anchors)
 
@@ -164,9 +165,10 @@ class Model(nn.Module):
             nn.init.normal_(layer.weight, std=0.01)
         self.cls_head[-1].apply(initialize_prior)
 
-    def forward(self, x, ids):
+    def forward(self, x):
         if self.training: x, targets = x
 
+        #print('#########forward')  
         # Backbones forward pass
         features = self.backbones(x)
         """
@@ -188,24 +190,35 @@ class Model(nn.Module):
         cls_heads = [cls_head.sigmoid() for cls_head in cls_heads]
         # for idx, feat in enumerate(features):
         #     np.save(os.path.join('/workspace/retinanet/debug', 'cls_head_{}_{}.npy'.format(ids, idx)), cls_heads[idx].cpu().numpy())
-
+      
+        if self.exporting:
+            print('self.exporting:!!!!!!!!!!!!!!!')
+            self.strides = strides
+            print('self.strides:', self.strides)
+            #self.strides = [x.shape[-1] // cls_head.shape[-1] for cls_head in cls_heads]
+            return cls_heads, box_heads
+    
         # Inference post-processing
         decoded = []
+        #print('strides:',strides)
         for stride, cls_head, box_head in zip(strides, cls_heads, box_heads):
             # Generate level's anchors
-            # stride = x.shape[-1] // cls_head.shape[-1]
+            #stride1 = x.shape[-1] // cls_head.shape[-1]
+            #print('XXXXXXXXXXXXXXXXXXstride:', stride1)
             # print(stride)
             # if stride not in self.anchors:
             #     tmp = generate_anchors(stride, self.ratios, self.scales)
             #     self.anchors[stride] = tmp
+            #print('!!!!!!!!!!!stride:', stride)
             self.anchors[stride] = torch.Tensor(cell_anchors[strides.index(stride)])
-
+            #print('self.anchors[stride]',self.anchors[stride])
             # Decode and filter boxes
             decoded.append(decode(cls_head, box_head, stride,
                 self.threshold, self.top_n, self.anchors[stride]))
 
         # Perform non-maximum suppression
         decoded = [torch.cat(tensors, 1) for tensors in zip(*decoded)]
+        #print('return nms###############')
         return nms(*decoded, self.nms, self.detections)
 
     def _extract_targets(self, targets, stride, size):
@@ -261,7 +274,9 @@ class Model(nn.Module):
 
     @classmethod
     def load(cls, cfg):
-
+        print("cfg.MODEL.WEIGHT",cfg.MODEL.WEIGHT)
+        #if not os.path.isfile(cfg.MODEL.WEIGHT):
+        #    raise ValueError('No checkpoint {}'.format(cfg.MODEL.WEIGHT)
         model_state_dict = torch.load(cfg.MODEL.WEIGHT)
         # Recreate model from checkpoint instead of from individual backbones
         model = cls(cfg, classes=cfg.RETINANET.NUM_CLASSES-1)
@@ -270,3 +285,42 @@ class Model(nn.Module):
         # np.save(os.path.join('/workspace/retinanet/debug', 'stem_conv_weight_load.npy'), model.backbones.body.stem.conv1.weight.cpu().numpy())
 
         return model
+
+    def export(self, size, batch, precision, calibration_files, calibration_table, verbose=True, onnx_only=False):
+
+        import torch.onnx.symbolic_opset9 as onnx_symbolic
+        #import pdb
+        #pdb.set_trace()
+        def upsample_nearest2d(g, input, output_size):
+            # Currently, TRT 5.1/6.0 ONNX Parser does not support all ONNX ops
+            # needed to support dynamic upsampling ONNX forumlation
+            # Here we hardcode scale=2 as a temporary workaround
+            scales = g.op("Constant", value_t=torch.tensor([1.,1.,2.,2.]))
+            return g.op("Upsample", input, scales, mode_s="nearest")
+
+        onnx_symbolic.upsample_nearest2d = upsample_nearest2d
+
+        # Export to ONNX
+        print('Exporting to ONNX...')
+        self.exporting = True
+        onnx_bytes = io.BytesIO()
+        zero_input = torch.zeros([1, 3, *size]).cuda()
+        extra_args = { 'verbose': verbose }
+        torch.onnx.export(self.cuda(), zero_input, onnx_bytes, verbose=True) #*extra_args)
+        self.exporting = False
+
+        if onnx_only:
+            return onnx_bytes.getvalue()
+
+        # Build TensorRT engine
+        model_name = ''.join(self.cfg.MODEL.BACKBONE.CONV_BODY)#'_'.join([k for k, _ in self.backbones.items()])
+        #anchors = [generate_anchors(stride, self.ratios, self.scales).view(-1).tolist()
+        #    for stride in self.strides]
+        #for stride in self.strides:
+        #    anchors[stride] = torch.Tensor(cell_anchors[strides.index(stride)])
+        anchors = [torch.Tensor(cell_anchors[strides.index(stride)]).view(-1).tolist()
+            for stride in self.strides]
+        print('anchors',anchors)
+        return Engine(onnx_bytes.getvalue(), len(onnx_bytes.getvalue()), batch, precision,
+            self.threshold, self.top_n, anchors, self.nms, self.detections, calibration_files, model_name, calibration_table, verbose)
+

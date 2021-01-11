@@ -6,8 +6,10 @@ import random
 import torch.cuda
 import torch.distributed
 import torch.multiprocessing
+import shutil
 
 from retinanet import infer
+from retinanet import infer_track
 from retinanet.model import Model
 from retinanet.config_defaults import _C as cfg
 from retinanet._C import Engine #junl
@@ -34,6 +36,20 @@ def parse(args):
     parser_infer.add_argument('--with-dali', help='use dali for data loading', action='store_true')
     parser_infer.add_argument('--full-precision', help='inference in full precision', action='store_true')
 
+    parser_infer = subparsers.add_parser('infer_track', help='run inference')
+    parser_infer.add_argument('--config_file', type=str, help='path to config file', default='../configs/MAL_X-101-FPN_e2e.yaml')
+    parser_infer.add_argument('--images', metavar='path', type=str, help='path to images', default='.')
+    parser_infer.add_argument('--annotations', metavar='annotations', type=str,
+                              help='evaluate using provided annotations')
+    parser_infer.add_argument('--output_path', metavar='folder', type=str, help='save detections to specified folder',
+                              default=None)
+    parser_infer.add_argument('--output', metavar='file', type=str, help='save detections to specified JSON file',
+                              default=None)
+    parser_infer.add_argument('--batch', metavar='size', type=int, help='batch size', default=4 * devcount)
+    parser_infer.add_argument('--resize', metavar='scale', type=int, help='resize to given size', default=800)
+    parser_infer.add_argument('--max-size', metavar='max', type=int, help='maximum resizing size', default=1333)
+    parser_infer.add_argument('--with-dali', help='use dali for data loading', action='store_true')
+    parser_infer.add_argument('--full-precision', help='inference in full precision', action='store_true')
   
     parser_export = subparsers.add_parser('export', help='export a model into a TensorRT engine')
     parser_export.add_argument('--config_file', type=str, help='path to config file', default='../configs/MAL_X-101-FPN_e2e.yaml')
@@ -108,6 +124,27 @@ def worker(rank, args, world, model, state):
         print('max_size:',args.max_size)
 
         infer.infer(model, args.images, args.output, args.resize, args.max_size, args.batch,
+            annotations=args.annotations, mixed_precision=not args.full_precision,
+            is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=True)
+
+    elif args.command == 'infer_track':
+        if model is None:  #junl
+            if rank == 0: print('Loading CUDA engine from {}...'.format(os.path.basename(cfg.MODEL.WEIGHT)))
+            print('cfg.MODEL.WEIGHT',cfg.MODEL.WEIGHT)
+            model = Engine.load(cfg.MODEL.WEIGHT)
+        #print('  resize:',args.resize)
+        print('max_size:',args.max_size)
+
+        if args.output_path is None:
+            args.output_path = args.images.split(os.sep)[-1]
+            args.output = args.images.split(os.sep)[-1] + '.json'
+            if not os.path.exists(args.output_path):
+                os.mkdir(args.output_path)
+            else:
+                shutil.rmtree(args.output_path)
+                os.mkdir(args.output_path)
+                
+        infer_track.infer(model, args.images, args.output_path, args.output, args.resize, args.max_size, args.batch,
             annotations=args.annotations, mixed_precision=not args.full_precision,
             is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=True)
 
