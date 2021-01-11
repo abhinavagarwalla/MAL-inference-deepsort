@@ -11,6 +11,7 @@ retinanet/dali.py
 retinanet/data.py
 retinanet/demo.py
 retinanet/infer.py
+retinanet/infer_track.py
 retinanet/loss.py
 retinanet/main.py
 retinanet/model.py

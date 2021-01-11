@@ -35,9 +35,6 @@ def compute_color_for_labels(label):
     """
     Simple function that adds fixed color depending on the class
     # """
-    # palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
-    # color = [int((p * (label ** 2 - label + 1)) % 255) for p in palette]
-    # return tuple(color)
     if label == 1:
         return (0, 255, 0)
     elif label == 2:
@@ -177,7 +174,7 @@ def infer(model, path, detections_path, detections_file, resize, max_size, batch
             profiler.start('track')
             # Pass detections to deepsort
             outputs_deepsort = deepsort.update(xywhs, confss, classes, imgs[0])
-            profile.stop('track')
+            profiler.stop('track')
 
             if len(outputs_deepsort) > 0:
                 bbox_xyxy = outputs_deepsort[:, :4]

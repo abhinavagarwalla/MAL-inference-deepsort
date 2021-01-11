@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.utils import data
 from pycocotools.coco import COCO
 import numpy as np
+from glob import glob
 
 class CocoDataset(data.dataset.Dataset):
     'Dataset looping through a set of images'
@@ -130,6 +131,107 @@ class CocoDataset(data.dataset.Dataset):
         ratios = torch.FloatTensor(ratios).view(-1, 1, 1)
         return data, torch.IntTensor(indices), ratios
 
+class VisDroneDataset(data.dataset.Dataset):
+    'Dataset looping through a set of images'
+
+    def __init__(self, path, resize, max_size, stride, annotations=None, training=False):
+        super().__init__()
+
+        self.path = os.path.expanduser(path)
+        self.resize = resize
+        self.max_size = max_size
+        self.stride = stride
+        self.mean = [102.9801, 115.9465, 122.7717]
+        self.std = [1., 1., 1.]
+        self.training = training
+        self.image = False
+
+        self.images = sorted(os.listdir(self.path))
+        print(self.images)
+        self.ids = range(len(self.images))
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, index):
+        ' Get sample'
+
+        # Load image
+        id = self.ids[index]
+        image = self.images[id]
+        im0 = Image.open('{}/{}'.format(self.path, image)).convert("RGB")
+
+        # Randomly sample scale for resize during training
+        resize = self.resize
+        if isinstance(resize, list):
+            resize = random.randint(self.resize[0], self.resize[-1])
+
+        ratio = resize / min(im0.size)
+        if ratio * max(im0.size) > self.max_size:
+            ratio = self.max_size / max(im0.size)
+        im = im0.resize((int(ratio * d) for d in im0.size), Image.BILINEAR)
+
+        r, g, b = im.split()
+        im = Image.merge("RGB", (b, g, r))
+
+        # imnp = cv2.imread('{}/{}'.format(self.path, image))
+        imnp = np.asarray(im)
+
+        # Convert to tensor and normalize
+        data = torch.ByteTensor(torch.ByteStorage.from_buffer(im.tobytes()))
+        data = data.float().view(*im.size[::-1], len(im.mode))
+
+        data = data.permute(2, 0, 1)
+        for t, mean, std in zip(data, self.mean, self.std):
+            t.sub_(mean).div_(std)
+
+        # Apply padding
+        pw, ph = ((self.stride - d % self.stride) % self.stride for d in im.size)
+        data = F.pad(data, (0, pw, 0, ph))
+
+        """
+        # debug
+        if id == 139:
+            print('id: {}, shape: {}'.format(id, data.shape))
+            np.save(os.path.join('/workspace/retinanet/debug', '{}.npy'.format(id)), data.cpu().numpy())
+        """
+
+        return data, id, ratio, imnp
+
+    def _get_target(self, id):
+        'Get annotations for sample'
+        raise NotImplementedError
+
+
+    def collate_fn(self, batch):
+        'Create batch from multiple samples'
+
+        if self.training:
+            data, targets = zip(*batch)
+            max_det = max([t.size()[0] for t in targets])
+            targets = [torch.cat([t, torch.ones([max_det - t.size()[0], 5]) * -1]) for t in targets]
+            targets = torch.stack(targets, 0)
+        else:
+            data, indices, ratios, imgs = zip(*batch)
+
+        # Pad data to match max batch dimensions
+        sizes = [d.size()[-2:] for d in data]
+        w, h = (max(dim) for dim in zip(*sizes))
+
+        data_stack = []
+        for datum in data:
+            pw, ph = w - datum.size()[-2], h - datum.size()[-1]
+            data_stack.append(
+                F.pad(datum, (0, ph, 0, pw)) if max(ph, pw) > 0 else datum)
+
+        data = torch.stack(data_stack)
+
+        if self.training:
+            return data, targets
+
+        ratios = torch.FloatTensor(ratios).view(-1, 1, 1)
+        return data, torch.IntTensor(indices), ratios, imgs
+
 class DataIterator():
     'Data loader for data parallel'
 
@@ -138,10 +240,10 @@ class DataIterator():
         self.max_size = max_size
 
         print('Data loader for data parallel')
-        self.dataset = CocoDataset(path, resize=resize, max_size=max_size,
+        self.dataset = VisDroneDataset(path, resize=resize, max_size=max_size,
             stride=stride, annotations=annotations, training=training)
         self.ids = self.dataset.ids
-        self.coco = self.dataset.coco
+        # self.coco = self.dataset.coco
     
         self.sampler = data.distributed.DistributedSampler(self.dataset) if world > 1 else None
         self.dataloader = data.DataLoader(self.dataset, batch_size=batch_size // world,
@@ -161,7 +263,7 @@ class DataIterator():
             if self.dataset.training:
                 data, target = output
             else:
-                data, ids, ratio = output
+                data, ids, ratio, im = output
 
             if torch.cuda.is_available():
                 data = data.cuda(non_blocking=True)
@@ -174,5 +276,5 @@ class DataIterator():
                 if torch.cuda.is_available():
                     ids = ids.cuda(non_blocking=True)
                     ratio = ratio.cuda(non_blocking=True)
-                yield data, ids, ratio
+                yield data, ids, ratio, im
   

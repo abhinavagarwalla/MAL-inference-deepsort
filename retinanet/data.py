@@ -147,7 +147,7 @@ class VisDroneDataset(data.dataset.Dataset):
         self.image = False
 
         self.images = sorted(os.listdir(self.path))
-        print(self.images)
+        # print(self.images)
         self.ids = range(len(self.images))
 
     def __len__(self):

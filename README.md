@@ -1,90 +1,66 @@
-# MAL-inference
-This repo is optimized for [Multiple Anchor Learning(MAL)](https://github.com/DeLightCMU/MAL) detector inference based on [NVIDIA Object Detection Toolkit (ODTK)](https://github.com/NVIDIA/retinanet-examples/).
+# MAL-inference-deepsort
+This repo accomplishes object tracking by combining the object detections from [Multiple Anchor Learning(MAL)](https://github.com/DeLightCMU/MAL) with [DeepSORT](https://github.com/ZQPei/deep_sort_pytorch). The tracker is tested on VisDrone-MOT videos.
 
-For more details of MAL, please refer to our CVPR2020 paper: [Multiple Anchor Learning for Visual Object Detection](https://openaccess.thecvf.com/content_CVPR_2020/papers/Ke_Multiple_Anchor_Learning_for_Visual_Object_Detection_CVPR_2020_paper.pdf)  and the [original MAL repo](https://github.com/DeLightCMU/MAL).
+For more details of MAL and DeepSORT, please refer to:
+- [Multiple Anchor Learning for Visual Object Detection](https://openaccess.thecvf.com/content_CVPR_2020/papers/Ke_Multiple_Anchor_Learning_for_Visual_Object_Detection_CVPR_2020_paper.pdf)  and the [original MAL repo](https://github.com/DeLightCMU/MAL).
+- [Simple Online and Realtime Tracking with a Deep Association Metric](https://arxiv.org/abs/1703.07402) and [Pytorch Implementation](https://github.com/ZQPei/deep_sort_pytorch).
 
-## Citation: 
 
+## Installation Instructions
+
+Follow from [MAL-inference](https://github.com/DeLightCMU/MAL-inference).
+
+
+
+## Steps to visualize inference 
+
+Use the infer_track subcommand.
+
+1. Run on a video from VisDrone dataset. For eg: `uav0000086_00000_v`.
 ```bash
-@inproceedings{kehuang2020,
-  title={Multiple Anchor Learning for Visual Object Detection},
-  author={Wei Ke and Tianliang Zhang and Zeyi Huang and Qixiang Ye and Jianzhuang Liu and Dong Huang},
-  booktitle={CVPR},
-  year={2020}
-}
+CUDA_VISIBLE_DEVICES=0 retinanet infer_track --config configs/MAL_R-50-FPN_e2e.yaml --images ../data/VisDrone2019-MOT-val/sequences/uav0000086_00000_v --batch 1
+```
+2. Unless otherwise specified, the outputs are saved in newly created directory `uav0000086_00000_v`. The output includes:
+  a. Per-frame bounding boxes detection along with tracking id, class id. People are depicted using green boxes, vehicles using red boxes, while all other classes are ignored.
+  b. Output detection file `uav0000086_00000_v.txt` for computing either CLEAR-MOT metrics or AP metrics.
+  c. Output detections in JSON format.
+
+3. To generate a video from the output images, use [get_video.sh](get_video.sh).
+```bash
+ffmpeg -framerate 25 -i %d.jpg -c:v libx264 -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" -profile:v high -crf 20 -pix_fmt yuv420p output.mp4
 ```
 
-## 1. Installation
-
-### Requirements:
-- Python>=3.6.9
-- Docker with API version >=Nvidia 1.4
-- Nvidia drivers with version >= 361 
-- cuda10.1
-- Tensorrt=6.0.1-1
-- g++ (Ubuntu 7.4.0-1ubuntu1~18.04.1) 7.4.0
-- Opencv >=3.4.0
-- PyTorch 1.3 with CUDA support
-- pycocotools
-
-
-### Step-by-step installation
+4. To compute AP metrics, run
 ```bash
-# install MAL-inference
-git https://github.com/DeLightCMU/MAL-inference.git
-
-# load MAL-inference in NVIDIA docker
-sudo docker run --gpus all -v /home/usrname/MAL-inference:/workspace --rm --ipc=host -it nvcr.io/nvidia/pytorch:19.10-py3
-
-# the following will install the lib with
-# symbolic links, so that you can modify
-# the files if you want and won't need to
-# re-build it
-cd MAL-inference
-python setup.py clean --all install
-python setup.py build develop
-#re-build C++ code
-cd extras/cppapi/build
-rm -rf *
-cmake -DCMAKE_CUDA_FLAGS="--expt-extended-lambda -std=c++11" ..
-make -j8
-```
-## 2. Download MAL model and convert to the ODTK format (TODO)
-
-| Backbone                | COCO test-dev mAP (single-scale) |Inference time | COCO pth models |
-| :---------------------: | :--------------: |:-------: | :------------:  |
-| ResNet-50-FPN           | 39.2| ms      |  [download](https://cmu.box.com/s/f70ewy7fh66bsb551v44hfskehgz07z3)   |
-| ResNet-101-FPN          | 43.6| ms      |  [download](https://cmu.box.com/s/dolnhky38kxrdx1x882tcic5ymu4usm7)   |
-| ResNext-101-FPN         | 45.9| ms      |  [download](https://cmu.box.com/s/5bgax4gqsyvv31w5uhwrywmvvikathnn)   |
-
-```bash
-#Download MAL model and convert to the ODTK format
-download resnet50 model to MAL-inference/models/resnet50/
-#edit convert script
-vi MAL-inference/models/transfer_model.py
- "
-  model_name = './resnet50/"downloadname.pth"'
-  transferred_model_name = './resnet50/transferred_model_XXXX.pth'
- "
-#convert  
-python models/transfer_model.py the MAL model will convert to ODTK format
+python compute_map.py <groundtruth_annotations> <detections_file>
 ```
 
-## 3. Running for COCO metrics (Pytorch)
+5. For computing CLEAR-MOT metrics, use the ground truth annotations and detections file with [py-motmetrics](https://github.com/cheind/py-motmetrics).
 ```bash
-#you need download cocco dataset in you computer  [COCO 2017](http://cocodataset.org/#download)
-CUDA_VISIBLE_DEVICES=0 retinanet infer "path to config file.yaml" MODEL.WEIGHT "path to.pth file" --images "path to coco dataset/val2017/"   --annotations "path to coco dataset/annotations/instances_val2017.json"  --batch=1
-
+python -m motmetrics.apps.eval_motchallenge <groundtruth_annotations_folder> <detections_folder>
 ```
-## 4. Running for single images (C++)
-```bash
-#export model to Tensorrt format 
-CUDA_VISIBLE_DEVICES=0 python retinanet/main.py export  --"path/to/config/file.yaml"  non.pth modelname.plan --size 800 1280(you can set high and wide according you need for example 800 1200 , 1024 1344 etc)
 
-cp modelname.plan extras/cppapi/build
+## Results
+| Sequence Number | Video |
+| :-------------: | :----: |
+| uav0000086_00000_v | [Link](https://drive.google.com/file/d/1GUjdH0PBHpmB8kipowqxWBFKyNfcGDjq/view?usp=sharing)|
+| uav0000117_02622_v | [Link](https://drive.google.com/file/d/1i-b2hg3Fg9Gl_zOyC39O052gZhlCgYiF/view?usp=sharing)|
 
-cd extras/cppapi/build
+| Sequence Number | AP | AP@0.25 | AP@0.5 | AP@0.75 | AP(people) | AP(vehicle) | MOTA |
+| :-------------: | :----: | :----: | :----: | :----: | :----: | :----: | :----: |
+| uav0000086_00000_v | 0.248 | 0.408 | 0.264 | 0.073 | 0.431 | 0.065 | 26.3 |
+| uav0000117_02622_v | 0.327 | 0.507 | 0.369 | 0.105 | 0.234 | 0.421 | -29.3 |
 
-./infer modelname.plan picturename.png
-```
+
+## Ablations
+
+- Varying input image size
+
+| Image Size | AP | AP for Seq1 | AP for Seq2 | FW Time | Tracking Time |
+| :---------: | :---------: | :---------: | :---------: |:---------: |:---------: |
+| 800 | 0.287 | 0.248 | 0.327 | | |
+| 1024 | 0.287 | 0.248 | 0.327 | 0.487s | 1.050s |
+| 400 | 0.2 | 0.178 | 0.222 | 0.174s | 1.261s |
+
+- Varying NMS threshold
 

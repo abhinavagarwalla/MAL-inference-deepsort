@@ -137,13 +137,14 @@ def worker(rank, args, world, model, state):
 
         if args.output_path is None:
             args.output_path = args.images.split(os.sep)[-1]
+        if not os.path.exists(args.output_path):
+            os.mkdir(args.output_path)
+        else:
+            shutil.rmtree(args.output_path)
+            os.mkdir(args.output_path)
+        if args.output is None:
             args.output = args.images.split(os.sep)[-1] + '.json'
-            if not os.path.exists(args.output_path):
-                os.mkdir(args.output_path)
-            else:
-                shutil.rmtree(args.output_path)
-                os.mkdir(args.output_path)
-                
+
         infer_track.infer(model, args.images, args.output_path, args.output, args.resize, args.max_size, args.batch,
             annotations=args.annotations, mixed_precision=not args.full_precision,
             is_master=(rank == 0), world=world, use_dali=args.with_dali, verbose=True)
