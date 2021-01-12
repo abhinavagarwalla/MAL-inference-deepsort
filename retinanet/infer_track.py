@@ -42,7 +42,7 @@ def compute_color_for_labels(label):
     else:
         return (255, 255, 255)
 
-def draw_boxes(img, bbox, identities=None, pclasses=None, offset=(0, 0)):
+def draw_boxes(img, bbox, identities=None, pclasses=None, color_code=None, offset=(0, 0)):
     for i, box in enumerate(bbox):
         x1, y1, x2, y2 = [int(i) for i in box]
         x1 += offset[0]
@@ -52,7 +52,8 @@ def draw_boxes(img, bbox, identities=None, pclasses=None, offset=(0, 0)):
         # box text and bar
         id = int(identities[i]) if identities is not None else 0
         pclass = pclasses[i]
-        color = compute_color_for_labels(pclass)
+        # pclass = pclasses
+        color = compute_color_for_labels(color_code)
         label = '{}{:d},{}'.format("", id, pclass)
         t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1, 1)[0]
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
@@ -177,10 +178,16 @@ def infer(model, path, detections_path, detections_file, resize, max_size, batch
             profiler.stop('track')
 
             if len(outputs_deepsort) > 0:
+                bbox_xyxy, identities, gtclasses = data_iterator.dataset._get_target(frame_idx)
+                bbox_xyxy *=  ratios.item()
+                # print
+                draw_boxes(imgs[0], bbox_xyxy, identities, gtclasses, 2)
+
                 bbox_xyxy = outputs_deepsort[:, :4]
                 identities = outputs_deepsort[:, -3]
                 pclasses = outputs_deepsort[:, -2]
-                draw_boxes(imgs[0], bbox_xyxy, identities, pclasses)
+                draw_boxes(imgs[0], bbox_xyxy, identities, pclasses, 1)
+
                 cv2.imwrite(os.path.join(detections_path, "{}.jpg".format(frame_idx)), imgs[0])
 
             # Write MOT compliant results to file

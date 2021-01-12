@@ -39,7 +39,7 @@ def parse(args):
     parser_infer = subparsers.add_parser('infer_track', help='run inference')
     parser_infer.add_argument('--config_file', type=str, help='path to config file', default='../configs/MAL_X-101-FPN_e2e.yaml')
     parser_infer.add_argument('--images', metavar='path', type=str, help='path to images', default='.')
-    parser_infer.add_argument('--annotations', metavar='annotations', type=str,
+    parser_infer.add_argument('--annotations', metavar='annotations', type=str, required=True,
                               help='evaluate using provided annotations')
     parser_infer.add_argument('--output_path', metavar='folder', type=str, help='save detections to specified folder',
                               default=None)

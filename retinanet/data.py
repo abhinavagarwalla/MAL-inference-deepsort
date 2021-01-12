@@ -9,6 +9,8 @@ from torch.utils import data
 from pycocotools.coco import COCO
 import numpy as np
 from glob import glob
+import pandas as pd
+
 
 class CocoDataset(data.dataset.Dataset):
     'Dataset looping through a set of images'
@@ -147,8 +149,14 @@ class VisDroneDataset(data.dataset.Dataset):
         self.image = False
 
         self.images = sorted(os.listdir(self.path))
-        # print(self.images)
         self.ids = range(len(self.images))
+
+        self.annotations = pd.read_csv(annotations, header=None, names=['FrameId', 'Id', 'X', 'Y', 'Width', 'Height', 'Confidence', 'ClassId', 'Visibility', 'unused'])
+        self.annotations['Width'] = self.annotations['Width'] + self.annotations['X']
+        self.annotations['Height'] = self.annotations['Height'] + self.annotations['Y']
+
+        visdrone_gt_mapping = {0:0, 1:1, 2:1, 3:2, 4:2, 5:2, 6:2, 7:2, 8:2, 9:2, 10:2, 11:0}
+        self.annotations['ClassId'] = self.annotations['ClassId'].map(visdrone_gt_mapping)
 
     def __len__(self):
         return len(self.ids)
@@ -200,8 +208,13 @@ class VisDroneDataset(data.dataset.Dataset):
 
     def _get_target(self, id):
         'Get annotations for sample'
-        raise NotImplementedError
+        # raise NotImplementedError
 
+        frame = self.annotations[self.annotations['FrameId'] == id]
+        bboxes_xyxy = torch.Tensor(frame[['X', 'Y', 'Width', 'Height']].to_numpy())
+        gtclasses = torch.Tensor(frame['ClassId'].to_numpy()).int()
+        identities = torch.Tensor(frame['Id'].to_numpy())
+        return bboxes_xyxy, identities, gtclasses
 
     def collate_fn(self, batch):
         'Create batch from multiple samples'
