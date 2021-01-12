@@ -209,6 +209,9 @@ def decode(all_cls_head, all_box_head, stride=1, threshold=0.05, top_n=1000, anc
 def nms(all_scores, all_boxes, all_classes, nms=0.5, ndetections=100):
     'Non Maximum Suppression'
 
+    # print("Value of nms: ", nms)
+    # exit()
+
     if torch.cuda.is_available():
         return nms_cuda(
             all_scores.float(), all_boxes.float(), all_classes.float(), nms, ndetections)

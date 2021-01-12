@@ -41,7 +41,8 @@ python -m motmetrics.apps.eval_motchallenge <groundtruth_annotations_folder> <de
 ```
 
 ## Results
-| Sequence Number | Video |
+
+| Sequence Number | Video (Download Recommended) |
 | :-------------: | :----: |
 | uav0000086_00000_v | [Link](https://drive.google.com/file/d/1GUjdH0PBHpmB8kipowqxWBFKyNfcGDjq/view?usp=sharing)|
 | uav0000117_02622_v | [Link](https://drive.google.com/file/d/1i-b2hg3Fg9Gl_zOyC39O052gZhlCgYiF/view?usp=sharing)|
@@ -58,9 +59,22 @@ python -m motmetrics.apps.eval_motchallenge <groundtruth_annotations_folder> <de
 
 | Image Size | AP | AP for Seq1 | AP for Seq2 | FW Time | Tracking Time |
 | :---------: | :---------: | :---------: | :---------: |:---------: |:---------: |
-| 800 | 0.287 | 0.248 | 0.327 | | |
+| 800 | 0.287 | 0.248 | 0.327 | 0.480s | 1.214s |
 | 1024 | 0.287 | 0.248 | 0.327 | 0.487s | 1.050s |
 | 400 | 0.2 | 0.178 | 0.222 | 0.174s | 1.261s |
 
 - Varying NMS threshold
 
+| Image Size | AP | AP for Seq1 | AP for Seq2 | FW Time | Tracking Time |
+| :---------: | :---------: | :---------: | :---------: |:---------: |:---------: |
+| 0.5 | 0.287 | 0.248 | 0.327 | 0.480s | 1.214s |
+| 0.75 | 0.268 | 0.235 | 0.302 | 0.486s | 1.016s |
+| 0.25 | 0.288 | 0.247 | 0.329 | 0.498s | 1.580s |
+
+- Varying number of detections
+
+| Number of detections | AP | AP for Seq1 | AP for Seq2 | FW Time | Tracking Time |
+| :---------: | :---------: | :---------: | :---------: |:---------: |:---------: |
+| 100 | 0.287 | 0.248 | 0.327 | 0.480s | 1.214s |
+| 200 | 0.285 | 0.242 | 0.329 | 0.552s | 1.651s |
+| 50 | 0.268 | 0.235 | 0.302 | 0.483s | 0.625s |

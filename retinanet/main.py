@@ -50,6 +50,8 @@ def parse(args):
     parser_infer.add_argument('--max-size', metavar='max', type=int, help='maximum resizing size', default=1333)
     parser_infer.add_argument('--with-dali', help='use dali for data loading', action='store_true')
     parser_infer.add_argument('--full-precision', help='inference in full precision', action='store_true')
+    parser_infer.add_argument('--model-config-nms', type=float, help='NMS threshold', default=None)
+    parser_infer.add_argument('--model-config-detections', type=int, help='Number of detections', default=None)
   
     parser_export = subparsers.add_parser('export', help='export a model into a TensorRT engine')
     parser_export.add_argument('--config_file', type=str, help='path to config file', default='../configs/MAL_X-101-FPN_e2e.yaml')
@@ -77,13 +79,19 @@ def load_model(args, verbose=False):
     _, ext = os.path.splitext(cfg.MODEL.WEIGHT)
     print('####ext:',ext)
 
+    model_config = {}
+    if args.model_config_nms is not None:
+        model_config['nms'] = args.model_config_nms
+    if args.model_config_detections is not None:
+        model_config['detections'] = args.model_config_detections
+    
     if ext == '.pth' or ext == '.torch':
        if verbose:
           print('Loading model from {}...'.format(os.path.basename(cfg.MODEL.WEIGHT)))
           #print('***********Cfg:',cfg)
           #print('#####*cfg.MODEL.WEIGHT:',cfg.MODEL.WEIGHT)
 
-       model = Model.load(cfg)
+       model = Model.load(cfg, config=model_config)
        if verbose:
         print(model)
     elif ext in ['.engine', '.plan']:

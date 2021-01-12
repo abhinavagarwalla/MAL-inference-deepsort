@@ -273,13 +273,13 @@ class Model(nn.Module):
         torch.save(checkpoint, state['path'])
 
     @classmethod
-    def load(cls, cfg):
+    def load(cls, cfg, config={}):
         print("cfg.MODEL.WEIGHT",cfg.MODEL.WEIGHT)
         #if not os.path.isfile(cfg.MODEL.WEIGHT):
         #    raise ValueError('No checkpoint {}'.format(cfg.MODEL.WEIGHT)
         model_state_dict = torch.load(cfg.MODEL.WEIGHT)
         # Recreate model from checkpoint instead of from individual backbones
-        model = cls(cfg, classes=cfg.RETINANET.NUM_CLASSES-1)
+        model = cls(cfg, classes=cfg.RETINANET.NUM_CLASSES-1, config=config)
         # np.save(os.path.join('/workspace/retinanet/debug', 'stem_conv_weight_load_dict.npy'), model_state_dict['backbones.body.stem.conv1.weight'].data.cpu().numpy())
         model.load_state_dict(model_state_dict, strict=True)
         # np.save(os.path.join('/workspace/retinanet/debug', 'stem_conv_weight_load.npy'), model.backbones.body.stem.conv1.weight.cpu().numpy())
