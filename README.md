@@ -42,10 +42,15 @@ python -m motmetrics.apps.eval_motchallenge <groundtruth_annotations_folder> <de
 
 ## Results
 
+Sample low-resolution video
+![uav0000086_00000_v](images/uav0000086_00000_v.gif)
+
+
 | Sequence Number | Video (Download Recommended) |
 | :-------------: | :----: |
 | uav0000086_00000_v | [Link](https://drive.google.com/file/d/1GUjdH0PBHpmB8kipowqxWBFKyNfcGDjq/view?usp=sharing)|
 | uav0000117_02622_v | [Link](https://drive.google.com/file/d/1i-b2hg3Fg9Gl_zOyC39O052gZhlCgYiF/view?usp=sharing)|
+
 
 | Sequence Number | AP | AP@0.25 | AP@0.5 | AP@0.75 | AP(people) | AP(vehicle) | MOTA |
 | :-------------: | :----: | :----: | :----: | :----: | :----: | :----: | :----: |
